@@ -21,57 +21,44 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 	connection.console.log(`ws: ${ws}`);
 	const capabilities: ServerCapabilities = {
 		definitionProvider: true,
+		referencesProvider: true,
 	};
 	return { capabilities };
 });
 
-const index = new Map<string, Location[]>();
+const definitions = new Map<string, Location[]>();
 
-function breakJSONIntoSingleObjects(str: string): { obj: any; start: number; end: number; }[] {
-	const objs = [];
-	let depth = 0;
-	let line = 1;
-	let start = -1;
-	let startLine = -1;
-	let inString = false;
-	let inStringEscSequence = false;
-	for (let i = 0; i < str.length; i++) {
-		const c = str[i];
-		if (inString) {
-			if (inStringEscSequence) {
-				inStringEscSequence = false;
-			} else {
-				if (c === '\\')
-					inStringEscSequence = true;
-				else if (c === '"')
-					inString = false;
-			}
-		} else {
-			if (c === '{') {
-				if (depth === 0) {
-					start = i;
-					startLine = line;
-				}
-				depth++;
-			} else if (c === '}') {
-				depth--;
-				if (depth === 0) {
-					objs.push({
-						obj: JSON.parse(str.slice(start, i + 1)),
-						start: startLine,
-						end: line,
-					});
-				}
-			} else if (c === "\"") {
-				inString = true;
-			} else if (c === '\n') {
-				line++;
+function addDefinition(type: string, id: string, location: Location) {
+	if (!definitions.has(id)) {
+		definitions.set(id, []);
+	}
+	definitions.get(id)!.push(location);
+}
+
+const references = new Map<string, Location[]>();
+
+function addReference(type: string, id: string, location: Location) {
+	if (!definitions.has(id)) {
+		definitions.set(id, []);
+	}
+	definitions.get(id)!.push(location);
+}
+
+function walkValues(node: Json.Node, f: (n: Json.Node) => void) {
+	f(node);
+	if (node.type === 'object') {
+		for (const property of node.children ?? []) {
+			if (property.type === 'property') {
+				if (property.children)
+					walkValues(property.children[1], f);
 			}
 		}
+	} else if (node.type === 'array') {
+		for (const value of node.children ?? []) {
+			walkValues(value, f);
+		}
 	}
-	return objs;
 }
-  
 
 connection.onInitialized(() => {
 	connection.console.info('listing modinfos');
@@ -89,18 +76,28 @@ connection.onInitialized(() => {
 				await Promise.all(jsonUris.map(async uri => {
 					const contents = await connection.sendRequest('cdda/readFile', uri) as Uint8Array;
 					const str = new TextDecoder().decode(contents);
-					const objs = breakJSONIntoSingleObjects(str);
-					for (const {obj, start, end} of objs) {
-						if (obj.id) {
-							if (!index.has(obj.id)) index.set(obj.id, []);
-							index.get(obj.id)!.push(Location.create(uri._formatted, Range.create(Position.create(start, 0), Position.create(end, 0))));
+					const doc = TextDocument.create(uri, "json", 0, str);
+					const parsed = Json.parseTree(str);
+					if (parsed && parsed.type === 'array') {
+						for (const obj of parsed.children ?? []) {
+							if (obj.type === 'object') {
+								const objStart = doc.positionAt(obj.offset);
+								const objEnd = doc.positionAt(obj.offset + obj.length);
+								const id = obj.children?.find(c => c.type === 'property' && c.children?.[0].value === 'id')?.children?.[1].value;
+								const type = obj.children?.find(c => c.type === 'property' && c.children?.[0].value === 'type')?.children?.[1].value;
+								if (id && type && typeof id === 'string' && typeof type === 'string') {
+									addDefinition(type, id, Location.create(uri._formatted, Range.create(objStart, objEnd)));
+								}
+								walkValues(obj, (n) => {
+									if (n.type === 'string') {
+										const start = doc.positionAt(n.offset);
+										const end = doc.positionAt(n.offset + n.length);
+										addReference('', n.value, Location.create(uri._formatted, Range.create(start, end)));
+									}
+								});
+							}
 						}
 					}
-					/*
-					const doc = TextDocument.create(uri, "json", 0, str);
-					const json = jsonLanguageService.parseJSONDocument(doc);
-					return json;
-					*/
 				}));
 				connection.console.log('done reading mod ' + modinfo.name);
 			} catch (e: any) {
@@ -122,7 +119,7 @@ connection.onDefinition((params) => {
 		const offset = document.offsetAt(params.position);
 		const node = parsed.getNodeFromOffset(offset);
 		if (node?.type === 'string') {
-			return index.get(node.value);
+			return definitions.get(node.value);
 		}
 		/*
 		// Get the top-level object
@@ -131,6 +128,19 @@ connection.onDefinition((params) => {
 		connection.console.log(`${root?.toString()}`);
 		connection.console.log(`${JSON.stringify(Json.getNodeValue(root!))}`);
 		*/
+	}
+	return [];
+});
+
+connection.onReferences((params) => {
+	const document = documents.get(params.textDocument.uri);
+	if (document) {
+		const parsed = jsonLanguageService.parseJSONDocument(document);
+		const offset = document.offsetAt(params.position);
+		const node = parsed.getNodeFromOffset(offset);
+		if (node?.type === 'string') {
+			return references.get(node.value);
+		}
 	}
 	return [];
 });
