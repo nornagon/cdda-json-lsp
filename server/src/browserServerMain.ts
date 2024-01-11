@@ -38,10 +38,10 @@ function addDefinition(type: string, id: string, location: Location) {
 const references = new Map<string, Location[]>();
 
 function addReference(type: string, id: string, location: Location) {
-	if (!definitions.has(id)) {
-		definitions.set(id, []);
+	if (!references.has(id)) {
+		references.set(id, []);
 	}
-	definitions.get(id)!.push(location);
+	references.get(id)!.push(location);
 }
 
 function walkValues(node: Json.Node, f: (n: Json.Node) => void) {
