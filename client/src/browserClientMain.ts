@@ -10,7 +10,9 @@ export async function activate(context: ExtensionContext) {
 	const documentSelector = [{ language: 'json' }];
 	const clientOptions: LanguageClientOptions = {
 		documentSelector,
-		synchronize: {},
+		synchronize: {
+			fileEvents: vscode.workspace.createFileSystemWatcher("**/*.json")
+		},
 		initializationOptions: {},
 		traceOutputChannel: vscode.window.createOutputChannel('CDDA Trace')
 	};
@@ -18,11 +20,11 @@ export async function activate(context: ExtensionContext) {
 	const client = createWorkerLanguageClient(context, clientOptions);
 	
 	context.subscriptions.push(client.onRequest("cdda/findFiles", async (arg) => {
-		return vscode.workspace.findFiles(arg, 'android' /* HACK: properly ignore symlinks */);
+		return (await vscode.workspace.findFiles(arg, 'android' /* HACK: properly ignore symlinks */)).map(u => u.toString());
 	}));
 
 	context.subscriptions.push(client.onRequest("cdda/readFile", async (arg) => {
-		return vscode.workspace.fs.readFile(arg);
+		return vscode.workspace.fs.readFile(Uri.parse(arg));
 	}));
 
 	context.subscriptions.push(client.onDidChangeState((e) => {
