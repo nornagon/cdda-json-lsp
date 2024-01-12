@@ -6,8 +6,6 @@ import { getLanguageService } from 'vscode-json-languageservice';
 import * as Json from "jsonc-parser";
 import * as path from 'path';
 
-console.log('running server cdda-json-lsp');
-
 const jsonLanguageService = getLanguageService({});
 
 const messageReader = new BrowserMessageReader(self);
