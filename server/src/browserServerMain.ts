@@ -58,6 +58,8 @@ function walkValues(node: Json.Node, f: (n: Json.Node) => void) {
 	}
 }
 
+function isIdKey(k: string) { return k === 'id' || k === 'abstract'; }
+
 async function indexFile(uri: string) {
 	const contents = await connection.sendRequest('cdda/readFile', uri) as Uint8Array;
 	const str = new TextDecoder().decode(contents);
@@ -69,7 +71,7 @@ async function indexFile(uri: string) {
 			if (obj.type === 'object') {
 				const objStart = doc.positionAt(obj.offset);
 				const objEnd = doc.positionAt(obj.offset + obj.length);
-				const id = obj.children?.find(c => c.type === 'property' && c.children?.[0].value === 'id')?.children?.[1].value;
+				const id = obj.children?.find(c => c.type === 'property' && isIdKey(c.children?.[0].value))?.children?.[1].value;
 				const type = obj.children?.find(c => c.type === 'property' && c.children?.[0].value === 'type')?.children?.[1].value;
 				if (id && type && typeof id === 'string' && typeof type === 'string') {
 					fileIndex.addDefinition(type, id, Location.create(uri, Range.create(objStart, objEnd)));
