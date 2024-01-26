@@ -18,7 +18,7 @@ export async function activate(context: ExtensionContext) {
 	};
 
 	const client = createWorkerLanguageClient(context, clientOptions);
-	
+
 	context.subscriptions.push(client.onRequest("cdda/findFiles", async (arg) => {
 		return (await vscode.workspace.findFiles(arg, 'android' /* HACK: properly ignore symlinks */)).map(u => u.toString());
 	}));
