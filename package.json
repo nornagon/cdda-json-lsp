@@ -3,7 +3,7 @@
 	"description": "A language server and VSCode plugin for Cataclysm: DDA JSON",
 	"author": "Jeremy Rose <nornagon@nornagon.net>",
 	"license": "MIT",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/nornagon/cdda-json-lsp"
