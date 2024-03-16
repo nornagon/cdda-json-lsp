@@ -2,6 +2,14 @@
 
 Enables "Go to Definition" and "Find References" for the JSON data files of the game [Cataclysm: Dark Days Ahead](https://cataclysmdda.org).
 
+<p align="center">
+  <img src="./images/go-to-definition.png" alt= "Go to definition">
+</p>
+  
+<p align="center">
+  <img src="./images/find-references.png" alt= "Find references">
+</p>
+
 ## Developing
 
 - Run `npm install` in this folder. This installs all necessary npm modules in both the client and server folder
